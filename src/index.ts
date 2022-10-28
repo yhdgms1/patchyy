@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { readFile, writeFile, open } from 'node:fs/promises'
+import { open } from 'node:fs/promises'
 
 type ValueOr<T> = T extends T & Function ? never : T | (() => T)
 
@@ -63,8 +63,9 @@ const Patchyy = class {
 	public async patch() {
 		for (const target of this.config) {
 			const id = this.resolve(target.id)
-			// @todo: open file
-			const source = await readFile(id, 'utf-8')
+
+			const file = await open(id, 'r+')
+			const source = await file.readFile('utf8')
 
 			let value = ''
 
@@ -93,7 +94,8 @@ const Patchyy = class {
 				value = part0 + separator + patched + separator + part1
 			}
 
-			await writeFile(id, value, 'utf-8')
+			await file.writeFile(value, 'utf8')
+			await file.close()
 		}
 	}
 }
