@@ -35,6 +35,11 @@ interface PatchyyRangeTarget {
 	readonly patch: (str: string) => string
 }
 
+interface PatchyyRawTarget {
+	readonly raw: true;
+	readonly patch: (file: string) => string;
+}
+
 interface PatchyyTarget {
 	/**
 	 * Файл, в котором будут произведены операции изменения
@@ -46,6 +51,7 @@ type PatchyyConfigModifiers =
 	| PatchyyLineTarget
 	| PatchyyFindTarget
 	| PatchyyRangeTarget
+	| PatchyyRawTarget
 
 type PatchyyConfig = readonly (PatchyyTarget & PatchyyConfigModifiers)[]
 
@@ -92,6 +98,8 @@ const Patchyy = class {
 				const part1 = lines.slice(end, lines.length).join(separator)
 
 				value = part0 + separator + patched + separator + part1
+			} else if ('raw' in target) {
+				value = target.patch(source);
 			}
 
 			await file.writeFile(value, 'utf8')
