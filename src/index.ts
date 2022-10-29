@@ -3,11 +3,48 @@ import { open } from 'node:fs/promises'
 
 const NEW_LINE_REGEX = /\r?\n/;
 const NEW_LINE = '\n';
+const EMPTY_STRING = '';
 
 type ValueOr<T> = T extends T & Function ? never : T | (() => T)
 
 const unwrap = <T>(val: ValueOr<T>): T => {
 	return typeof val === 'function' ? val() : val
+}
+
+const apply = (source: string, target: PatchyyTarget) => {
+	if ('at' in target) {
+		const index = unwrap(target.at) - 1
+		const lines = source.split('\n')
+
+		lines[index] = target.patch(lines[index])
+
+		return lines.join('\n')
+	} else if ('find' in target) {
+		return source.replace(unwrap(target.find), target.patch)
+	} else if ('range' in target) {
+		const [start, end] = target.range
+
+		if (target.line) {
+			const lines = source.split(NEW_LINE_REGEX)
+			const content = lines.slice(start, end).join(NEW_LINE)
+
+			const patched = target.patch(content)
+
+			const part0 = lines.slice(0, start).join(NEW_LINE)
+			const part1 = lines.slice(end, lines.length).join(NEW_LINE)
+
+			return part0 + NEW_LINE + patched + NEW_LINE + part1
+		} else {
+			const content = source.substring(start, end)
+
+			const part0 = source.substring(0, start)
+			const part1 = source.substring(end, source.length)
+
+			return part0 + target.patch(content) + part1
+		}
+	} else if ('raw' in target) {
+		return target.patch(source)
+	}
 }
 
 interface PatchyyFindTarget {
@@ -43,7 +80,7 @@ interface PatchyyRawTarget {
 	readonly patch: (file: string) => string;
 }
 
-interface PatchyyTarget {
+interface PatchyyBaseTarget {
 	/**
 	 * Файл, в котором будут произведены операции изменения
 	 */
@@ -56,7 +93,8 @@ type PatchyyConfigModifiers =
 	| PatchyyRangeTarget
 	| PatchyyRawTarget
 
-type PatchyyConfig = readonly (PatchyyTarget & PatchyyConfigModifiers)[]
+type PatchyyTarget = PatchyyBaseTarget & PatchyyConfigModifiers;
+type PatchyyConfig = readonly PatchyyTarget[]
 
 const Patchyy = class {
 	private config: PatchyyConfig
@@ -70,49 +108,27 @@ const Patchyy = class {
 	}
 
 	public async patch() {
-		for await (const target of this.config) {
-			const id = this.resolve(target.id)
+		const init: Record<string, PatchyyTarget[]> = {}
+		const config = this.config.reduce((acc, curr) => {
+			const id = this.resolve(curr.id);
 
+			if (!acc[id]) acc[id] = [];
+
+			acc[id].push(curr);
+
+			return acc;
+		}, init);
+
+		for (const [id, entries] of Object.entries(config)) {
 			const file = await open(id, 'r+')
 			const source = await file.readFile('utf8')
 
-			let value = ''
+			let value = source;
 
-			if ('at' in target) {
-				const index = unwrap(target.at) - 1
-				const lines = source.split('\n')
-
-				lines[index] = target.patch(lines[index])
-
-				value = lines.join('\n')
-			} else if ('find' in target) {
-				value = source.replace(unwrap(target.find), target.patch)
-			} else if ('range' in target) {
-				const [start, end] = target.range
-
-				if (target.line) {
-					const lines = source.split(NEW_LINE_REGEX)
-					const content = lines.slice(start, end).join(NEW_LINE)
-
-					const patched = target.patch(content)
-
-					const part0 = lines.slice(0, start).join(NEW_LINE)
-					const part1 = lines.slice(end, lines.length).join(NEW_LINE)
-
-					value = part0 + NEW_LINE + patched + NEW_LINE + part1
-				} else {
-					const content = source.substring(start, end);
-
-					const part0 = source.substring(0, start);
-					const part1 = source.substring(end, source.length);
-
-					value = part0 + target.patch(content) + part1;
-				}
-			} else if ('raw' in target) {
-				value = target.patch(source);
+			for (const target of entries) {
+				value = apply(value, target) || EMPTY_STRING
 			}
 
-			// TODO: safe writing
 			await file.writeFile(value, 'utf8')
 			await file.close()
 		}
