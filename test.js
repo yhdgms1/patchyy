@@ -8,3 +8,11 @@ export default async function main() {
 export function test() {
     throw 'no'
 }
+// hello world
+
+export default async function main() {
+    return '';
+}
+
+
+
