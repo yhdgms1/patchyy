@@ -76,13 +76,7 @@ const Patchyy = class {
 	}
 }
 
-const CustomPatchyy = class extends Patchyy {
-	public resolve(id: string): string {
-		return resolve('./', id)
-	}
-}
-
-const patchyy = new CustomPatchyy([
+const patchyy = new Patchyy([
 	{
 		id: '@babel/core/lib/config/config-descriptors.js',
 		at: 61,
@@ -104,7 +98,7 @@ const patchyy = new CustomPatchyy([
 	},
 	{
 		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [75, 104],
+		range: [74, 104],
 		line: true,
 		patch() {
 			return ''
@@ -112,22 +106,7 @@ const patchyy = new CustomPatchyy([
 	},
 	{
 		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [1, 14],
-		patch() {
-			return ''
-		},
-	},
-	{
-		id: 'test.js',
-		range: [3, 8],
-		patch(content) {
-			return content + ' world'
-		},
-	},
-	{
-		id: 'test.js',
-		range: [7, 10],
-		line: true,
+		range: [0, 13],
 		patch() {
 			return ''
 		},
