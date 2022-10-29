@@ -41,27 +41,33 @@ const apply = (source: string, target: PatchyyTarget) => {
 	}
 }
 
+/**
+ * Base class of Patchyy
+ * @param config Array of PatchyyTarget
+ */
 const Patchyy = class {
-	private config: PatchyyConfig
+	config: PatchyyConfig
 
 	constructor(config: PatchyyConfig = []) {
 		this.config = config
 	}
 
+	/**
+	 * Method to resolve `id`'s
+	 */
 	public resolve(id: string): string {
 		return resolve('./node_modules', id)
 	}
 
+	/**
+	 * Start patching
+	 */
 	public async patch() {
 		const init: Record<string, PatchyyTarget[]> = {}
 		const config = this.config.reduce((acc, curr) => {
-			const id = this.resolve(curr.id)
+			const id = this.resolve(curr.id);
 
-			if (!acc[id]) acc[id] = []
-
-			acc[id].push(curr)
-
-			return acc
+			return (acc[id] || (acc[id] = [])).push(curr), acc;
 		}, init)
 
 		for (const [path, entries] of Object.entries(config)) {
@@ -76,41 +82,5 @@ const Patchyy = class {
 	}
 }
 
-const patchyy = new Patchyy([
-	{
-		id: '@babel/core/lib/config/config-descriptors.js',
-		at: 61,
-		patch(line) {
-			return line.replace(
-				'optionsWithResolvedBrowserslistConfigFile(options, dirname)',
-				'options'
-			)
-		},
-	},
-	{
-		id: '@babel/core/lib/config/config-chain.js',
-		find() {
-			return '(babelrc === true || babelrc === undefined) && typeof context.filename === "string"'
-		},
-		patch() {
-			return 'false'
-		},
-	},
-	{
-		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [74, 104],
-		line: true,
-		patch() {
-			return ''
-		},
-	},
-	{
-		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [0, 13],
-		patch() {
-			return ''
-		},
-	},
-])
-
-patchyy.patch()
+export { Patchyy }
+export type { PatchyyConfig, PatchyyTarget }

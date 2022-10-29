@@ -6,7 +6,6 @@ export default defineConfig(options => {
       splitting: false,
       sourcemap: false,
       clean: true,
-      dts: !options.watch,
       format: ['esm']
     };
 });
