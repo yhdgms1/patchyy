@@ -1,6 +1,9 @@
 import { resolve } from 'node:path'
 import { open } from 'node:fs/promises'
 
+const NEW_LINE_REGEX = /\r?\n/;
+const NEW_LINE = '\n';
+
 type ValueOr<T> = T extends T & Function ? never : T | (() => T)
 
 const unwrap = <T>(val: ValueOr<T>): T => {
@@ -67,7 +70,7 @@ const Patchyy = class {
 	}
 
 	public async patch() {
-		for (const target of this.config) {
+		for await (const target of this.config) {
 			const id = this.resolve(target.id)
 
 			const file = await open(id, 'r+')
@@ -87,62 +90,91 @@ const Patchyy = class {
 			} else if ('range' in target) {
 				const [start, end] = target.range
 
-				const separator = target.line ? '\n' : ''
+				if (target.line) {
+					const lines = source.split(NEW_LINE_REGEX)
+					const content = lines.slice(start, end).join(NEW_LINE)
 
-				const lines = source.split(separator)
-				const content = lines.slice(start - 1, end).join(separator)
+					const patched = target.patch(content)
 
-				const patched = target.patch(content)
+					const part0 = lines.slice(0, start).join(NEW_LINE)
+					const part1 = lines.slice(end, lines.length).join(NEW_LINE)
 
-				const part0 = lines.slice(0, start - 1).join(separator)
-				const part1 = lines.slice(end, lines.length).join(separator)
+					value = part0 + NEW_LINE + patched + NEW_LINE + part1
+				} else {
+					const content = source.substring(start, end);
 
-				value = part0 + separator + patched + separator + part1
+					const part0 = source.substring(0, start);
+					const part1 = source.substring(end, source.length);
+
+					value = part0 + target.patch(content) + part1;
+				}
 			} else if ('raw' in target) {
 				value = target.patch(source);
 			}
 
+			// TODO: safe writing
 			await file.writeFile(value, 'utf8')
 			await file.close()
 		}
 	}
 }
 
-const patchyy = new Patchyy([
+const CustomPatchyy = class extends Patchyy {
+	public resolve(id: string): string {
+		return resolve('./', id);
+	}
+}
+
+const patchyy = new CustomPatchyy([
+	// {
+	// 	id: '@babel/core/lib/config/config-descriptors.js',
+	// 	at: 61,
+	// 	patch(line) {
+	// 		return line.replace(
+	// 			'optionsWithResolvedBrowserslistConfigFile(options, dirname)',
+	// 			'options'
+	// 		)
+	// 	},
+	// },
+	// {
+	// 	id: '@babel/core/lib/config/config-chain.js',
+	// 	find() {
+	// 		return '(babelrc === true || babelrc === undefined) && typeof context.filename === "string"'
+	// 	},
+	// 	patch() {
+	// 		return 'false'
+	// 	},
+	// },
+	// {
+	// 	id: '@babel/core/lib/config/helpers/config-api.js',
+	// 	range: [75, 104],
+	// 	line: true,
+	// 	patch() {
+	// 		return ''
+	// 	},
+	// },
+	// {
+	// 	id: '@babel/core/lib/config/helpers/config-api.js',
+	// 	range: [1, 14],
+	// 	patch() {
+	// 		return ''
+	// 	},
+	// },
 	{
-		id: '@babel/core/lib/config/config-descriptors.js',
-		at: 61,
-		patch(line) {
-			return line.replace(
-				'optionsWithResolvedBrowserslistConfigFile(options, dirname)',
-				'options'
-			)
-		},
+		id: 'test.js',
+		range: [3, 8],
+		patch(content) {
+			return content + ' world';
+		}
 	},
 	{
-		id: '@babel/core/lib/config/config-chain.js',
-		find() {
-			return '(babelrc === true || babelrc === undefined) && typeof context.filename === "string"'
-		},
-		patch() {
-			return 'false'
-		},
-	},
-	{
-		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [75, 104],
+		id: 'test.js',
+		range: [7, 10],
 		line: true,
 		patch() {
-			return ''
-		},
-	},
-	{
-		id: '@babel/core/lib/config/helpers/config-api.js',
-		range: [1, 14],
-		patch() {
-			return ''
-		},
-	},
+			return '';
+		}
+	}
 ])
 
 patchyy.patch()
