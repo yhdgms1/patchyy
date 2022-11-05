@@ -54,3 +54,13 @@ const patchyy = new Patchyy([
 // Run!!
 patchyy.patch();
 ```
+
+## Overriding default `id` resolving method
+
+```ts
+const MyPatchyy = class extends Patchyy {
+	resolve(id: string) {
+		return super.resolve(id) + '.js';
+	}
+}
+```
