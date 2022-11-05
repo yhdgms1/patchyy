@@ -8,11 +8,11 @@ import { unwrap } from './helpers'
 const apply = (source: string, target: PatchyyTarget) => {
 	if ('at' in target) {
 		const index = unwrap(target.at) - 1
-		const lines = source.split('\n')
+		const lines = source.split(NEW_LINE_REGEX)
 
 		lines[index] = target.patch(lines[index])
 
-		return lines.join('\n')
+		return lines.join(NEW_LINE)
 	} else if ('find' in target) {
 		return source.replace(unwrap(target.find), target.patch)
 	} else if ('range' in target) {
